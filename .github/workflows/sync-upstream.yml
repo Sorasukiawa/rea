@@ -1,0 +1,41 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "23 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'Sorasukiawa/rea' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM_REPOSITORY: morluto/rea
+      SYNC_BRANCH: main
+    steps:
+      - name: Sync and verify upstream ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_sha=$(gh api "repos/${UPSTREAM_REPOSITORY}/git/ref/heads/${SYNC_BRANCH}" --jq '.object.sha')
+
+          # GitHub merges upstream changes while preserving fork commits.
+          # A conflict fails the job; this workflow never forces an update.
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/merge-upstream" -f branch="${SYNC_BRANCH}"
+
+          behind=$(gh api "repos/${UPSTREAM_REPOSITORY}/compare/${upstream_sha}...${GITHUB_REPOSITORY_OWNER}:${SYNC_BRANCH}" --jq '.behind_by')
+          if [[ "${behind}" != "0" ]]; then
+            echo "::error::The fork still lacks ${behind} commits from the checked upstream revision."
+            exit 1
+          fi
+          printf 'Synced `%s` from `%s` through `%s`; fork commits are preserved.\n' \
+            "${SYNC_BRANCH}" "${UPSTREAM_REPOSITORY}" "${upstream_sha}" >> "${GITHUB_STEP_SUMMARY}"
