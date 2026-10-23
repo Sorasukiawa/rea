@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      GH_TOKEN: ${{ github.token }}
+      # GITHUB_TOKEN cannot merge upstream changes that modify workflow files.
+      GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
       UPSTREAM_REPOSITORY: morluto/rea
       SYNC_BRANCH: main
     steps:
@@ -30,7 +31,15 @@ jobs:
 
           # GitHub merges upstream changes while preserving fork commits.
           # A conflict fails the job; this workflow never forces an update.
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/merge-upstream" -f branch="${SYNC_BRANCH}"
+          error_log=$(mktemp)
+          trap 'rm -f "$error_log"' EXIT
+          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/merge-upstream" -f branch="${SYNC_BRANCH}" 2>"$error_log"; then
+            cat "$error_log" >&2
+            if grep -Eqi 'workflow|workflows' "$error_log"; then
+              echo "::error::Upstream changed workflow files. Configure UPSTREAM_SYNC_TOKEN with repository Contents and Workflows write permissions; the default GITHUB_TOKEN cannot perform this merge. See docs/fork-sync.md."
+            fi
+            exit 1
+          fi
 
           behind=$(gh api "repos/${UPSTREAM_REPOSITORY}/compare/${upstream_sha}...${GITHUB_REPOSITORY_OWNER}:${SYNC_BRANCH}" --jq '.behind_by')
           if [[ "${behind}" != "0" ]]; then
