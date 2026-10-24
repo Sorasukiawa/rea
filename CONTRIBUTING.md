@@ -10,10 +10,18 @@ and maintenance cost. Keep cosmetic polish with useful fixes; confusing or
 incorrect user instructions warrant standalone corrections. Collect other
 cosmetic-only suggestions in an issue rather than separate PRs.
 
-For capability organization and provider composition, use the
-[architecture map](docs/architecture.mermaid). Production factories in
-`src/composition/` construct fresh providers without starting engines or acquiring
-targets; optional adapter failures must preserve successful peers. Run
+For selected architectural owners and dependency paths, use the
+[architecture map](docs/architecture.mermaid). It is not a complete directory or
+import inventory. For current provider wiring, start with
+[`src/composition/binary.ts`](src/composition/binary.ts) for deep candidates and
+the other `src/composition/` factories for tool services, including
+[`gpu.ts`](src/composition/gpu.ts) and [`model.ts`](src/composition/model.ts).
+Live Frida and Cutter adapters are constructed directly in
+[`src/cli/fridaCommands.ts`](src/cli/fridaCommands.ts),
+[`src/cli/cutterCommands.ts`](src/cli/cutterCommands.ts), and
+[`src/server/createServer.ts`](src/server/createServer.ts).
+Production factories construct fresh providers without starting engines or
+acquiring targets; optional adapter failures must preserve successful peers. Run
 `npm run verify:test-discovery` after adding or moving tests. Resolved import
 boundaries are checked by `npm run verify:module-boundaries`, included in lint.
 
@@ -21,8 +29,13 @@ For analysis workflows and agent interfaces, follow the
 [performance priorities](AGENTS.md#performance). Explain the selected output
 scope, reuse/cache decisions, and relevant before/after measurements when these
 costs change.
+Use the [analysis optimization skill](.agents/skills/rea-analysis-optimization/SKILL.md)
+to locate provider and shared-workflow bottlenecks, preserve Evidence, and
+compare equivalent real tasks before claiming an improvement.
 
 When adding or changing an MCP tool, follow the [tool design guide](docs/tool-design.md) and preserve the canonical contracts and generated catalog.
+When adding or changing an admission ceiling, budget, or deadline, follow
+[admission limits and recovery](docs/design/limits-and-recovery.md).
 
 ## Reporting issues
 
@@ -67,7 +80,7 @@ Before requesting maintainer review, the human owner must:
   passing. Follow the [verification requirements](#development-feedback-and-pr-verification)
   for required checks and real-provider coverage.
 - Complete the **Author readiness** declaration in the PR template, explicitly
-  stating that the current revision is ready for review.
+  stating that the PR is ready for initial review.
 
 Keep the PR description concise and current. Explain the problem, observable
 outcome, approach, and useful evidence; link long logs or put them in optional
@@ -78,10 +91,23 @@ approval or permission to merge.
 
 Draft PRs may request early feedback with open questions and incomplete checks.
 Leave the readiness declaration unchecked until the human owner has completed
-it. After further changes, clear the ready-for-review checkbox until the owner
-reviews the updated diff, refreshes affected validation and the PR description,
-and renews the declaration. AI agents must leave human declarations to the human
-owner and must not attest to a human review on their behalf.
+it. The declaration records initial readiness; later pushes do not invalidate
+it or require another human sign-off. Keep the PR description and affected
+validation current as work changes. AI agents must leave human declarations to
+the human owner and must not attest to a human review on their behalf.
+
+The `PR readiness` check reports pending for drafts and requires a named human
+owner and all three template declarations for non-drafts. It checks that the
+declaration is filled, not whether the code or evidence is correct. Existing PRs
+can copy the **Author readiness** section from the current template.
+Open PRs must have distinct head commits because GitHub shares commit statuses.
+
+Maintainers enable merge enforcement after the workflow is merged: run
+`gh workflow run pr-readiness.yml -f pull_request_number=NUMBER` for existing
+open PRs, then add `PR readiness` from GitHub Actions to the branch's required
+status checks alongside its existing checks. Deploy the workflow to each
+protected target branch before requiring it there. The workflow reads PR
+metadata using trusted default-branch code and writes only a commit status.
 
 Maintainers may return a PR to the author or close it when the problem is
 unsupported, validation is missing, or the owner cannot explain the change.
@@ -212,13 +238,29 @@ manifest. A source checkout does not: `native/windows/build/` is ignored by
 Git, and neither `npm ci` nor `npm run build:cached` (or `npm run build`)
 produces `rea-windows-x64.node` or `manifest.json` in that directory.
 Windows workflows and tests that require native controls need these artifacts;
-without them, those controls are unavailable even after a successful runtime build.
+this includes `run-exclusive` commands, which use the native Job Object to keep
+the artifact lock until every command descendant has exited. Without the
+artifacts, those controls are unavailable even after a successful runtime
+build.
 
 Follow the [Windows native build guide](native/windows/README.md#build) before
 running those workflows from source. The artifact build requires Linux,
 MinGW-w64, and `tar`; the build script does not run on Windows. See that guide
 for the build and artifact-verification commands and the separate real Windows
 verification prerequisites. Keep the generated addon and manifest uncommitted.
+
+The general source suite (`npm run test:fast`, `npm run test:changed`, and
+`npm run test:local`) runs on Linux in CI, and Windows CI runs a curated lane.
+On a Windows checkout, some source tests fail because fixtures use POSIX paths,
+`#!/bin/sh` tool stubs, or POSIX rename semantics. Compare failures against the
+base revision, or run the suite on Linux or WSL, before attributing them to a
+change. See [testing](docs/testing.md#developer-commands) for command scopes
+and lane selection.
+
+`git submodule update --init --recursive` fails at the pinned Unblob submodule
+on Windows and can leave later submodules unchecked out. Apply the
+[Unblob checkout workaround](docs/firmware-analysis.md#windows-submodule-checkout),
+then rerun the command.
 
 ## Documentation website
 
@@ -241,6 +283,23 @@ The separate GitHub Pages host uses only the manual
 `.github/workflows/website-pages.yml` workflow on `main`. The repository's
 **Settings → Pages → Build and deployment → Source** must be set to
 **GitHub Actions** before deploying there.
+
+### Translation corrections
+
+README editions and website editions have separate translation sources:
+
+- Find the language's `readme` path in the
+  [language inventory](website/locales/languages.json) and edit that file.
+  Locale codes and README suffixes can differ. Use the
+  [English README](README.md) to check commands, requirements, and analysis claims.
+- Edit `msgstr` values in `website/locales/<language>/messages.po` for website
+  text. Follow the [website translation guide](website/locales/README.md) for
+  the Python environment, catalog validation, and local preview. Preserve source
+  strings, contexts, placeholders, commands, paths, and recorded evidence.
+
+Before submitting a website translation, run the catalog and website checks in
+that guide. Translated HTML in `website/_site/` is generated; edit the PO catalog
+rather than the generated pages.
 
 ## Development feedback and PR verification
 

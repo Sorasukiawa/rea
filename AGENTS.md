@@ -20,6 +20,10 @@ Give each interpretation and resource a clear owner. Consumers must use that own
 
 Keep proof of ownership separate from validity, editability, and readiness. Malformed owned data may still be safely removable. Unresolved identity or applicability must remain unknown rather than be treated as absent, foreign, or aligned.
 
+For lifecycle changes, follow [ownership and completion invariants](docs/tool-design.md#own-the-lifecycle) and select the applicable [lifecycle regressions](docs/testing.md#lifecycle-regressions). Include late handshakes, cancellation during final cleanup, mixed child outcomes, and cleanup retry where those stages exist; active-execution cancellation alone does not cover finalization.
+
+Before adding complexity for a speculative or vanishingly unlikely race or security edge case, explain the concrete failure mode, likelihood, and complexity cost to the user and get their buy-in. Do not silently expand scope for theoretical robustness.
+
 Assess brittleness in touched code during implementation, debugging, review, and maintenance. Fix the producing representation or ownership rule before adding downstream repairs. Normalize once at the owning boundary using format-aware parsers. Remove superseded representations, aliases, wrappers, and redundant tests after verifying affected consumers. Introduce abstractions only when they remove observed complexity.
 
 When fixing a bug, inspect the producing boundary and affected consumers for duplicated interpretation or unclear ownership. Complete any directly related refactor in the same change and remove superseded code. Passing regression tests alone does not establish that the brittleness is resolved. If related cleanup remains, explain what remains and why.
@@ -57,7 +61,7 @@ do not establish fewer tokens or faster analysis.
 
 ## Development
 
-Use [.nvmrc](.nvmrc) and `package.json#packageManager` for the pinned toolchain. Cursor Cloud may place older Node.js first on `PATH`; environment setup installs the pinned toolchain under `/usr/local/bin`.
+Use [.nvmrc](.nvmrc) and `package.json#packageManager` for the pinned toolchain. Cursor Cloud may place older Node.js first on `PATH`; environment setup installs the pinned toolchain under `/usr/local/bin`. Prefix `PATH="/usr/local/bin:$PATH"` before `node` and `npm`.
 
 - `npm ci`: install locked dependencies.
 - `npm run build:cached`: build the runtime and packaged skill.
@@ -67,6 +71,8 @@ Use [.nvmrc](.nvmrc) and `package.json#packageManager` for the pinned toolchain.
 - `npm run docs:check`: validate generated documentation.
 
 Use relevant checks for the change. The complete local gate, `npm run check:pr`, is optional for broad changes or CI diagnosis. See [CONTRIBUTING.md](CONTRIBUTING.md) for development, generated-file ownership, and release conventions.
+
+Coordinate expensive checks across agents. If a test unexpectedly consumes heavy CPU, stop its owned process family and profile a bounded representative case before retrying. Inspect production work, fixture generation, subprocesses, and repeated setup; preserve regression coverage when optimizing. Follow the [test resource guidance](docs/testing.md#developer-commands).
 
 `docs/public/product-catalog.json`, `docs/verification/managed-conformance-*.json`, and `skills/` are ignored outputs. Edit source contracts and `.agents/skills/reverse-engineer-anything/`, then regenerate as needed. `.cache/mcp-tool-catalog.json` is test metadata; runtime builds and source checking do not consume it. Never commit binaries, provider project documents, credentials, `dist/`, `node_modules/`, or local planning artifacts.
 
@@ -94,7 +100,7 @@ required to open an issue.
 Follow [human ownership and readiness](CONTRIBUTING.md#pull-request-ownership-and-readiness)
 when preparing a PR. AI-assisted contributions are welcome; a human must review
 and own the final diff, check the validation evidence and its limitations, and
-explicitly declare the current revision ready for maintainer review.
+explicitly declare the PR ready for initial maintainer review.
 
 Keep the PR body concise and current, with the concrete problem, observable
 outcome, approach, and evidence. Report only checks that actually ran as executed;
@@ -103,11 +109,11 @@ Address actionable automated review findings and explain disagreements.
 
 Leave the template's **Author readiness** declarations unchecked for the human
 owner to complete. Never attest to human review on their behalf. Keep the PR in
-draft until the human declares the current diff ready. After further changes,
-clear the ready-for-review checkbox and refresh affected evidence so the human
-can review and renew the declaration. CI and automated review results support
-review; they do not establish human readiness, maintainer scope approval, or
-merge permission.
+draft until the human declares the PR initially ready. Later pushes do not
+invalidate that declaration or require another human sign-off. Keep the PR body
+and affected validation current as work changes. The readiness check validates
+the filled declaration; CI and automated review results do not establish that
+human review occurred, maintainer scope approval, or merge permission.
 
 <!-- BEGIN:turborepo-agent-rules -->
 
