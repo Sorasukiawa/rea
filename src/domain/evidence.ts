@@ -50,6 +50,7 @@ const subjectFormatSchema = z.enum([
   "dos-mz",
   "dos-com",
   "raw-binary",
+  "gamecube-dol",
   "zip",
   "ipa",
   "apk",
@@ -72,6 +73,7 @@ const subjectFormatSchema = z.enum([
   "javascript-bundle",
   "entitlements",
   "pyinstaller",
+  "node-sea",
 ]);
 const subjectBaseSchema = z.strictObject({
   name: z.string().min(1),
@@ -81,7 +83,7 @@ const subjectBaseSchema = z.strictObject({
 // The format owns the architecture claim, including nested Evidence subjects.
 const subjectSchema = z.discriminatedUnion("format", [
   subjectBaseSchema.extend({
-    format: subjectFormatSchema.exclude(["raw-binary"]),
+    format: subjectFormatSchema.exclude(["raw-binary", "gamecube-dol"]),
     architecture: z
       .enum(BINARY_ARCHITECTURES)
       .exclude([...RAW_ONLY_ARCHITECTURES])
@@ -90,6 +92,10 @@ const subjectSchema = z.discriminatedUnion("format", [
   subjectBaseSchema.extend({
     format: z.literal("raw-binary"),
     architecture: z.enum(BINARY_ARCHITECTURES).nullable(),
+  }),
+  subjectBaseSchema.extend({
+    format: z.literal("gamecube-dol"),
+    architecture: z.literal("powerpc"),
   }),
 ]);
 /** Source location attached to an evidence observation. */
