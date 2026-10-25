@@ -37,7 +37,7 @@ import type {
 import { OFFICIAL_TOOL_CONTRACTS } from "../../contracts/officialToolContracts.js";
 import { compareUnicodeCodePoints } from "../../domain/unicodeCodePointOrder.js";
 
-import type { EvidenceDisplayReplacement } from "../investigation/EvidenceLedger.js";
+import type { EvidenceMetadataReplacement } from "../investigation/EvidenceLedger.js";
 
 const RELATIONSHIP_OPERATIONS: ReadonlySet<AnalysisOperation> = new Set([
   "procedure_callers",
@@ -183,9 +183,9 @@ export class AnalysisSnapshotCache {
     return imported;
   }
 
-  /** Refresh only display bindings backed by the replaced authenticated records. */
-  refreshEvidenceDisplay(
-    replacements: readonly EvidenceDisplayReplacement[],
+  /** Refresh subject bindings backed by replaced authenticated metadata. */
+  refreshEvidenceMetadata(
+    replacements: readonly EvidenceMetadataReplacement[],
   ): void {
     if (this.#target === undefined || this.#binding === undefined) return;
     const header = { target: this.#target, binding: this.#binding };
@@ -436,6 +436,9 @@ export class AnalysisSnapshotCache {
     // The snapshot format does not carry reference truncation; a replay would
     // present a capped read as complete, so it is not recorded.
     if (execution.referencesTruncated === true) return;
+    // Provider snapshot entries do not carry execution source records. Replay
+    // must not discard the source closure that supplies the parent's Evidence links.
+    if ((execution.sourceEvidence?.length ?? 0) > 0) return;
     const queryId = analysisQueryId(
       snapshotTarget(target),
       snapshotBinding(profile),
